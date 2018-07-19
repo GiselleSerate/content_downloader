@@ -17,7 +17,8 @@
 # Author: Brian Torres-Gil <btorres-gil@paloaltonetworks.com>
 
 
-"""Palo Alto Networks dynamic content update downloader
+"""
+Palo Alto Networks dynamic content update downloader
 
 Downloads the latest content packs from paloaltonetworks.com.
 
