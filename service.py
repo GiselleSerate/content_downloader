@@ -39,7 +39,7 @@ from flask import Flask
 from flask import abort
 from flask import render_template
 from flask import request
-from flask import send_file
+from flask import send_from_directory
 from werkzeug.exceptions import BadRequest, HTTPException
 
 from .content_downloader import ContentDownloader, LoginError, GetLinkError
@@ -48,7 +48,7 @@ from .content_downloader import ContentDownloader, LoginError, GetLinkError
 app = Flask(__name__)
 
 # declare our download cache base directory
-download_dir = '/tmp/content_downloader/cache'
+download_dir = '/var/tmp/content_updates/'
 
 
 # default route -
@@ -104,12 +104,15 @@ def download_content():
         cached_files = os.listdir(package_dir)
         # do we have a previously downloaded file?
         if len(cached_files) > 0:
+            # sort the files then return the one with the highest sequenced name (panupv2-all-contents-8044-4859)
+            cached_files.sort()
+            newest_file = cached_files[-1]
             # yep, just return here, if not, continue getting the latest update
-            return send_file(os.path.join(package_dir, cached_files[0]))
+            return send_from_directory(package_dir, newest_file, as_attachment=True)
 
     try:
         content_downloader = ContentDownloader(username=username, password=password, package=package,
-                                           debug=True)
+                                               debug=True)
     except LoginError:
         return abort(401, 'Could not log in to support portal with supplied credentials')
 
@@ -120,13 +123,13 @@ def download_content():
 
     # check out cache dir
     downloaded_versions = list()
-    for f in os.listdir(download_dir):
+    for f in os.listdir(package_dir):
         downloaded_versions.append(f)
 
     # Check if already downloaded latest and do nothing
     # FIXME - I'm sure this could use a bit more logic to grab the latest and greatest...
     if filename in downloaded_versions:
-        return send_file(os.path.join(download_dir, filename))
+        return send_from_directory(package_dir, filename, as_attachment=True)
 
     # Get download URL
     try:
@@ -135,12 +138,12 @@ def download_content():
         return abort(417, 'Could not find download link!')
 
     try:
-        filename = content_downloader.download(download_dir, fileurl, filename)
+        filename = content_downloader.download(package_dir, fileurl, filename)
     except HTTPException:
         # FIXME - what exceptions can happen here?
         return abort(500, 'Error downloading file')
 
-    return send_file(os.path.join(download_dir, filename))
+    return send_from_directory(package_dir, filename, as_attachment=True)
 
 
 @app.before_first_request
