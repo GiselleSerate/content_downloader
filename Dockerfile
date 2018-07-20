@@ -8,6 +8,7 @@ WORKDIR /app
 ADD requirements.txt /app/requirements.txt
 RUN pip install -r requirements.txt
 
+RUN mkdir -p /var/tmp/content_updates/
 COPY . /app/content_downloader/
 
 EXPOSE 5003
