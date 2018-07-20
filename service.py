@@ -19,6 +19,15 @@ Palo Alto Networks dynamic content update downloader service
 
 Provides a single REST API endpoint to download content updates
 
+Running:
+    build the docker container with:
+    `docker build -t nembery/panos_content_downloader:v0.1 .`
+
+    Or run the flask service directly with:
+    `pip install -r requirements.txt`
+    `export FLASK_APP=./service.py`
+    `flask run --host=0.0.0.0 --port=5003`
+
 This software is provided without support, warranty, or guarantee.
 Use at your own risk.
 
