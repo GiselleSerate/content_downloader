@@ -41,7 +41,9 @@ from flask import render_template
 from flask import request
 from flask import send_from_directory
 from werkzeug.exceptions import BadRequest, HTTPException
-import urllib
+
+from HTMLParser import HTMLParser
+
 from .content_downloader import ContentDownloader, LoginError, GetLinkError
 
 # init flask context
@@ -86,8 +88,8 @@ def download_content():
         password_quoted = posted_json['password']
         package = posted_json['package']
         update = posted_json.get('force_update', "True")
-
-        password = urllib.unquote(password_quoted)
+        h = HTMLParser()
+        password = h.unescape(password_quoted)
 
     except BadRequest:
         return abort(500, 'Could not parse JSON payload')
