@@ -120,11 +120,18 @@ def download_content():
                                                debug=True)
     except LoginError:
         return abort(401, 'Could not log in to support portal with supplied credentials')
+    except Exception as e:
+        print('Caught some sort of error')
+        print(e)
+        return abort(500, 'what happened?')
 
+    app.logger.debug('Logged in')
+    print('Logging in')
     # Check latest version. Login if necessary.
     token, updates = content_downloader.check()
 
     filename, foldername, latestversion = content_downloader.find_latest_update(updates)
+    app.logger.debug('Found latest filename %s' % filename)
 
     # check out cache dir
     downloaded_versions = list()
@@ -134,6 +141,7 @@ def download_content():
     # Check if already downloaded latest and do nothing
     # FIXME - I'm sure this could use a bit more logic to grab the latest and greatest...
     if filename in downloaded_versions:
+        app.logger.debug('Returning cached file %s' % filename)
         return send_from_directory(package_dir, filename, as_attachment=True)
 
     # Get download URL
@@ -142,12 +150,15 @@ def download_content():
     except GetLinkError:
         return abort(417, 'Could not find download link!')
 
+    app.logger.debug('Got fileurl %s' % fileurl)
     try:
+        app.logger.debug('downloading file')
         filename = content_downloader.download(package_dir, fileurl, filename)
     except HTTPException:
         # FIXME - what exceptions can happen here?
         return abort(500, 'Error downloading file')
 
+    app.logger.debug('Returning new file')
     return send_from_directory(package_dir, filename, as_attachment=True)
 
 
@@ -156,7 +167,7 @@ def init_application():
     # set up logging
     handler = logging.StreamHandler(sys.stdout)
     app.logger.addHandler(handler)
-    app.logger.setLevel(logging.INFO)
+    app.logger.setLevel(logging.DEBUG)
 
     if not os.path.exists(download_dir):
         os.makedirs(download_dir)

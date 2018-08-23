@@ -29,28 +29,32 @@ Works with python 2.7 only.
 """
 
 from __future__ import print_function
-import os
-import sys
-import re
-import cookielib
-import logging
+
 import ConfigParser
 import argparse
+import cookielib
 import json
+import logging
+import os
+import re
+import sys
 from datetime import datetime
 
 import mechanize
 import requests
 
+
 # Optional: Disable insecure platform warnings
-#import requests.packages.urllib3
-#requests.packages.urllib3.disable_warnings()
+# import requests.packages.urllib3
+# requests.packages.urllib3.disable_warnings()
 
 class LoginError(StandardError):
     pass
 
+
 class GetLinkError(StandardError):
     pass
+
 
 class UnknownPackage(StandardError):
     pass
@@ -75,20 +79,20 @@ class ContentDownloader(object):
     URL to download the file.
     """
     PACKAGE_KEY = {
-        "appthreat":  "CONTENTS",
-        "app":        "APPS",
-        "antivirus":  "VIRUS",
-        "wildfire":   "WILDFIRE_OLDER",
-        "wildfire2":  "WILDFIRE_NEWEST",
-        "wf500":      "WF-500 CONTENT",
-        "traps":      "TRAPS3.4",
+        "appthreat": "CONTENTS",
+        "app": "APPS",
+        "antivirus": "VIRUS",
+        "wildfire": "WILDFIRE_OLDER",
+        "wildfire2": "WILDFIRE_NEWEST",
+        "wf500": "WF-500 CONTENT",
+        "traps": "TRAPS3.4",
         "clientless": "GPCONTENTS",
     }
     LOGIN_URL = "https://identity.paloaltonetworks.com/idp/startSSO.ping?PartnerSpId=supportCSP&TargetResource=https://support.paloaltonetworks.com/Updates/DynamicUpdates/245"
     UPDATE_URL = "https://support.paloaltonetworks.com/Updates/DynamicUpdates/245"
     GET_LINK_URL = "https://support.paloaltonetworks.com/Updates/GetDownloadUrl"
 
-    def __init__(self, username, password, package="appthreat", debug=False):
+    def __init__(self, username, password, package="appthreat", debug=True):
         if package is None:
             package = "appthreat"
         if package not in self.PACKAGE_KEY:
@@ -112,12 +116,13 @@ class ContentDownloader(object):
         br.set_cookiejar(self.cj)
         # Browser options
         br.set_handle_equiv(True)
-        #br.set_handle_gzip(True)
+        # br.set_handle_gzip(True)
         br.set_handle_redirect(True)
         br.set_handle_referer(True)
         br.set_handle_robots(False)
         br.addheaders = [
-            ("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/44.0.2403.157 Safari/537.36"),
+            ("User-Agent",
+             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/44.0.2403.157 Safari/537.36"),
         ]
         if debug:
             br.set_debug_http(True)
@@ -126,7 +131,6 @@ class ContentDownloader(object):
         return br
 
     def login(self):
-        logging.info("Logging in")
         self.browser.open(self.LOGIN_URL)
         self.browser.select_form(nr=0)
         self.browser.form['Email'] = self.username
@@ -138,7 +142,7 @@ class ContentDownloader(object):
         if self.browser.response().read().find(
                 "Since your browser does not support JavaScript,"
                 " you must press the Resume button once to proceed."
-        ) == -1: # Getting this message is good
+        ) == -1:  # Getting this message is good
             raise LoginError("Failed to login")
         # No Javascript, so have to submit the "Resume form"
         self.browser.open(self.UPDATE_URL)
@@ -149,7 +153,7 @@ class ContentDownloader(object):
         self._save_cookies()
 
     def check(self):
-        logging.info("Checking for new content updates: %s" % self.package)
+        logging.debug("Checking for new content updates: %s" % self.package)
         result = self._check()
         needlogin = False
         if result.find("<h1>Single Sign On</h1>") != -1:
@@ -158,13 +162,16 @@ class ContentDownloader(object):
         elif result.find("<h4>You are not authorized to perform this action.</h4>") != -1:
             needlogin = True
             logging.debug("Got not authorized page")
+        elif result.find('webData.pageName = "support:portal:Unauth Home"') != -1:
+            needlogin = True
+            logging.debug("Got loading screen")
         elif result.find('<img src="/assets/img/pan-loading.gif" alt="Loading"/>') != -1:
             needlogin = True
             logging.debug("Got loading screen")
         if needlogin:
-            logging.info("Not logged in.")
+            logging.debug("Not logged in.")
             self.login()
-            logging.info("Checking for new content updates (2nd attempt)")
+            logging.debug("Checking for new content updates (2nd attempt)")
             result = self._check()
         # Grab the __RequestVerificationToken
         self.browser.select_form(nr=0)
@@ -181,7 +188,7 @@ class ContentDownloader(object):
         updates_of_type = [u for u in updates if u['Key'] == self.key]
         updates_sorted = sorted(updates_of_type, key=lambda x: datetime.strptime(x['ReleaseDate'], '%Y-%m-%dT%H:%M:%S'))
         latest = updates_sorted[-1]
-        logging.info("Found latest update:  {0}  Released {1}".format(latest['FileName'], latest['ReleaseDate']))
+        logging.debug("Found latest update:  {0}  Released {1}".format(latest['FileName'], latest['ReleaseDate']))
         return latest['FileName'], latest['FolderName'], latest['VersionNumber']
 
     def get_download_link(self, token, filename, foldername):
@@ -250,7 +257,8 @@ def main():
     username, password, download_dir = get_config('content_downloader.conf')
 
     # Create contentdownloader object
-    content_downloader = ContentDownloader(username=username, password=password, package=options.package, debug=debugenabled)
+    content_downloader = ContentDownloader(username=username, password=password, package=options.package,
+                                           debug=debugenabled)
 
     # Check latest version. Login if necessary.
     token, updates = content_downloader.check()
@@ -265,17 +273,17 @@ def main():
 
     # Check if already downloaded latest and do nothing
     if filename in downloaded_versions:
-        logging.info("Already downloaded latest version: {0}".format(filename))
+        logging.debug("Already downloaded latest version: {0}".format(filename))
         sys.exit(0)
 
     # Get download URL
     fileurl = content_downloader.get_download_link(token, filename, foldername)
 
     # Download latest version to download directory
-    logging.info("Downloading latest version: %s" % latestversion)
+    logging.debug("Downloading latest version: %s" % latestversion)
     filename = content_downloader.download(download_dir, fileurl, filename)
     if filename is not None:
-        logging.info("Finished downloading file: %s" % filename)
+        logging.debug("Finished downloading file: %s" % filename)
     else:
         logging.error("Unable to download latest content update")
 

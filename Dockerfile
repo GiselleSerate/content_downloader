@@ -1,7 +1,7 @@
 FROM python:2.7
 
 LABEL description="PanOS - Dynamic Updates Content Downloader"
-LABEL version="0.1"
+LABEL version="0.7"
 LABEL maintainer="btorres-gil@paloaltonetworks.com"
 
 WORKDIR /app
