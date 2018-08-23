@@ -33,7 +33,10 @@ Use at your own risk.
 
 """
 
+import logging
 import os
+import sys
+from HTMLParser import HTMLParser
 
 from flask import Flask
 from flask import abort
@@ -41,8 +44,6 @@ from flask import render_template
 from flask import request
 from flask import send_from_directory
 from werkzeug.exceptions import BadRequest, HTTPException
-
-from HTMLParser import HTMLParser
 
 from .content_downloader import ContentDownloader, LoginError, GetLinkError
 
@@ -152,5 +153,10 @@ def download_content():
 
 @app.before_first_request
 def init_application():
+    # set up logging
+    handler = logging.StreamHandler(sys.stdout)
+    app.logger.addHandler(handler)
+    app.logger.setLevel(logging.INFO)
+
     if not os.path.exists(download_dir):
         os.makedirs(download_dir)
