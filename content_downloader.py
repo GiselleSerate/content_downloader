@@ -211,7 +211,7 @@ def get_config(filename):
     config = ConfigParser.SafeConfigParser({"filedir": ""})
     config.read(filename)
     username = config.get('config', 'username')
-    password = config.get('config', 'password')
+    password = config.get('config', 'password', raw=True)
     download_dir = config.get('config', 'filedir')
     if download_dir == "":
         download_dir = os.getcwd()
