@@ -25,7 +25,7 @@ Downloads the latest content packs from paloaltonetworks.com.
 This software is provided without support, warranty, or guarantee.
 Use at your own risk.
 
-Works with python 2.7 only.
+Now works with Python 3.
 """
 
 from __future__ import print_function
@@ -101,7 +101,7 @@ class ContentDownloader(object):
         self.password = password
         self.package = package
         self.key = self.PACKAGE_KEY[package]
-        self.filename_type = 'ReleaseNotesFileName' if isReleaseNotes else 'FileName'
+        self.filename_string = 'ReleaseNotesFileName' if isReleaseNotes else 'FileName'
         self.cj = http.cookiejar.LWPCookieJar()
         try:
             self.cj.load("cookies.txt", ignore_discard=True, ignore_expires=True)
@@ -191,8 +191,8 @@ class ContentDownloader(object):
         updates_of_type = [u for u in updates if u['Key'] == self.key]
         updates_sorted = sorted(updates_of_type, key=lambda x: datetime.strptime(x['ReleaseDate'], '%Y-%m-%dT%H:%M:%S'))
         latest = updates_sorted[-1]
-        logging.debug("Found latest update:  {0}  Released {1}".format(latest[self.filename_type], latest['ReleaseDate']))
-        return latest[self.filename_type], latest['FolderName'], latest['VersionNumber']
+        logging.debug("Found latest update:  {0}  Released {1}".format(latest[self.filename_string], latest['ReleaseDate']))
+        return latest[self.filename_string], latest['FolderName'], latest['VersionNumber']
 
     def get_download_link(self, token, filename, foldername):
         headers = {'Content-Type': 'application/json; charset=UTF-8',
