@@ -30,9 +30,9 @@ Works with python 2.7 only.
 
 from __future__ import print_function
 
-import ConfigParser
+import configparser
 import argparse
-import cookielib
+import http.cookiejar
 import json
 import logging
 import os
@@ -48,15 +48,15 @@ import requests
 # import requests.packages.urllib3
 # requests.packages.urllib3.disable_warnings()
 
-class LoginError(StandardError):
+class LoginError(Exception):
     pass
 
 
-class GetLinkError(StandardError):
+class GetLinkError(Exception):
     pass
 
 
-class UnknownPackage(StandardError):
+class UnknownPackage(Exception):
     pass
 
 
@@ -101,7 +101,7 @@ class ContentDownloader(object):
         self.password = password
         self.package = package
         self.key = self.PACKAGE_KEY[package]
-        self.cj = cookielib.LWPCookieJar()
+        self.cj = http.cookiejar.LWPCookieJar()
         try:
             self.cj.load("cookies.txt", ignore_discard=True, ignore_expires=True)
         except IOError:
@@ -137,12 +137,9 @@ class ContentDownloader(object):
         self.browser.form['Password'] = self.password
         self.browser.submit()
         # This has resulted in an error page
-        if self.browser.response().read().find("The user name or password provided is incorrect.") != -1:
+        if self.browser.response().read().find(bytes("The user name or password provided is incorrect.", 'utf-8')) != -1:
             raise LoginError("Username or password is incorrect")
-        if self.browser.response().read().find(
-                "Since your browser does not support JavaScript,"
-                " you must press the Resume button once to proceed."
-        ) == -1:  # Getting this message is good
+        if self.browser.response().read().find(bytes("Since your browser does not support JavaScript, you must press the Resume button once to proceed.", 'utf-8')) == -1:  # Getting this message is good
             raise LoginError("Failed to login")
         # No Javascript, so have to submit the "Resume form"
         self.browser.open(self.UPDATE_URL)
@@ -156,16 +153,16 @@ class ContentDownloader(object):
         logging.debug("Checking for new content updates: %s" % self.package)
         result = self._check()
         needlogin = False
-        if result.find("<h1>Single Sign On</h1>") != -1:
+        if result.find(bytes("<h1>Single Sign On</h1>", 'utf-8')) != -1:
             needlogin = True
             logging.debug("Got single sign on page")
-        elif result.find("<h4>You are not authorized to perform this action.</h4>") != -1:
+        elif result.find(bytes("<h4>You are not authorized to perform this action.</h4>", 'utf-8')) != -1:
             needlogin = True
             logging.debug("Got not authorized page")
-        elif result.find('webData.pageName = "support:portal:Unauth Home"') != -1:
+        elif result.find(bytes('webData.pageName = "support:portal:Unauth Home"', 'utf-8')) != -1:
             needlogin = True
             logging.debug("Got loading screen")
-        elif result.find('<img src="/assets/img/pan-loading.gif" alt="Loading"/>') != -1:
+        elif result.find(bytes('<img src="/assets/img/pan-loading.gif" alt="Loading"/>', 'utf-8')) != -1:
             needlogin = True
             logging.debug("Got loading screen")
         if needlogin:
@@ -215,7 +212,7 @@ class ContentDownloader(object):
 
 
 def get_config(filename):
-    config = ConfigParser.SafeConfigParser({"filedir": ""})
+    config = configparser.ConfigParser({"filedir": ""})
     config.read(filename)
     username = config.get('config', 'username')
     password = config.get('config', 'password', raw=True)
@@ -244,6 +241,8 @@ def enable_logging(options):
             logging_level = logging.DEBUG
             logging_format = '%(levelname)s: %(message)s'
         logging.basicConfig(format=logging_format, level=logging_level)
+    else:
+        return False
     return True if options.verbose > 1 else False
 
 
