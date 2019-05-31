@@ -142,7 +142,10 @@ class ContentDownloader(object):
         # This has resulted in an error page
         if response.read().decode(encoding).find("The user name or password provided is incorrect.") != -1:
             raise LoginError("Username or password is incorrect")
+        response = self.browser.response()
+        encoding = response.info().get_param('charset', 'utf8')
         if response.read().decode(encoding).find("Since your browser does not support JavaScript, you must press the Resume button once to proceed.") == -1:  # Getting this message is good
+            print(response.read()) # TODO oh boy. 
             raise LoginError("Failed to login")
         # No Javascript, so have to submit the "Resume form"
         self.browser.open(self.UPDATE_URL)
