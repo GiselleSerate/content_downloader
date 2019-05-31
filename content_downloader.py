@@ -178,7 +178,7 @@ class ContentDownloader(object):
         # Grab the __RequestVerificationToken
         self.browser.select_form(nr=0)
         token = self.browser.form['__RequestVerificationToken']
-        match = re.search(r'"data":({"Data":.*?"Total":\d+,"AggregateResults":null})', result)
+        match = re.search(rb'"data":({"Data":.*?"Total":\d+,"AggregateResults":null})', result)
         updates = json.loads(match.group(1))
         logging.debug(updates)
         return token, updates['Data']
