@@ -145,7 +145,6 @@ class ContentDownloader(object):
         response = self.browser.response()
         encoding = response.info().get_param('charset', 'utf8')
         if response.read().decode(encoding).find("Since your browser does not support JavaScript, you must press the Resume button once to proceed.") == -1:  # Getting this message is good
-            print(response.read()) # TODO oh boy. 
             raise LoginError("Failed to login")
         # No Javascript, so have to submit the "Resume form"
         self.browser.open(self.UPDATE_URL)
@@ -203,7 +202,7 @@ class ContentDownloader(object):
                    'X-Requested-With': 'XMLHttpRequest',
                    }
         payload = {'__RequestVerificationToken': token,
-                   'FileName': filename, # TODO should do something abt this?
+                   'FileName': filename,
                    'FolderName': foldername,
                    }
         response = requests.post(self.GET_LINK_URL, json=payload, headers=headers).json()
