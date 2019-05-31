@@ -158,16 +158,16 @@ class ContentDownloader(object):
         logging.debug("Checking for new content updates: %s" % self.package)
         result = self._check()
         needlogin = False
-        if result.find(bytes("<h1>Single Sign On</h1>", 'utf-8')) != -1:
+        if result.find("<h1>Single Sign On</h1>") != -1:
             needlogin = True
             logging.debug("Got single sign on page")
-        elif result.find(bytes("<h4>You are not authorized to perform this action.</h4>", 'utf-8')) != -1:
+        elif result.find("<h4>You are not authorized to perform this action.</h4>") != -1:
             needlogin = True
             logging.debug("Got not authorized page")
-        elif result.find(bytes('webData.pageName = "support:portal:Unauth Home"', 'utf-8')) != -1:
+        elif result.find('webData.pageName = "support:portal:Unauth Home"') != -1:
             needlogin = True
             logging.debug("Got loading screen")
-        elif result.find(bytes('<img src="/assets/img/pan-loading.gif" alt="Loading"/>', 'utf-8')) != -1:
+        elif result.find('<img src="/assets/img/pan-loading.gif" alt="Loading"/>') != -1:
             needlogin = True
             logging.debug("Got loading screen")
         if needlogin:
@@ -178,7 +178,7 @@ class ContentDownloader(object):
         # Grab the __RequestVerificationToken
         self.browser.select_form(nr=0)
         token = self.browser.form['__RequestVerificationToken']
-        match = re.search(rb'"data":({"Data":.*?"Total":\d+,"AggregateResults":null})', result)
+        match = re.search(r'"data":({"Data":.*?"Total":\d+,"AggregateResults":null})', result)
         updates = json.loads(match.group(1))
         logging.debug(updates)
         return token, updates['Data']
