@@ -202,7 +202,7 @@ class ContentDownloader(object):
                    'X-Requested-With': 'XMLHttpRequest',
                    }
         payload = {'__RequestVerificationToken': token,
-                   'FileName': filename,
+                   'FileName': filename, # TODO should do something abt this?
                    'FolderName': foldername,
                    }
         response = requests.post(self.GET_LINK_URL, json=payload, headers=headers).json()
