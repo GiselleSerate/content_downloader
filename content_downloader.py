@@ -92,7 +92,7 @@ class ContentDownloader(object):
     UPDATE_URL = "https://support.paloaltonetworks.com/Updates/DynamicUpdates/245"
     GET_LINK_URL = "https://support.paloaltonetworks.com/Updates/GetDownloadUrl"
 
-    def __init__(self, username, password, package="appthreat", debug=True):
+    def __init__(self, username, password, package="appthreat", debug=True, isReleaseNotes=False):
         if package is None:
             package = "appthreat"
         if package not in self.PACKAGE_KEY:
@@ -101,6 +101,7 @@ class ContentDownloader(object):
         self.password = password
         self.package = package
         self.key = self.PACKAGE_KEY[package]
+        self.filename_type = 'ReleaseNotesFileName' if isReleaseNotes else 'FileName'
         self.cj = http.cookiejar.LWPCookieJar()
         try:
             self.cj.load("cookies.txt", ignore_discard=True, ignore_expires=True)
@@ -177,6 +178,7 @@ class ContentDownloader(object):
         token = self.browser.form['__RequestVerificationToken']
         match = re.search(r'"data":({"Data":.*?"Total":\d+,"AggregateResults":null})', result)
         updates = json.loads(match.group(1))
+        logging.debug(updates)
         return token, updates['Data']
 
     def _check(self):
@@ -189,8 +191,8 @@ class ContentDownloader(object):
         updates_of_type = [u for u in updates if u['Key'] == self.key]
         updates_sorted = sorted(updates_of_type, key=lambda x: datetime.strptime(x['ReleaseDate'], '%Y-%m-%dT%H:%M:%S'))
         latest = updates_sorted[-1]
-        logging.debug("Found latest update:  {0}  Released {1}".format(latest['FileName'], latest['ReleaseDate']))
-        return latest['FileName'], latest['FolderName'], latest['VersionNumber']
+        logging.debug("Found latest update:  {0}  Released {1}".format(latest[self.filename_type], latest['ReleaseDate']))
+        return latest[self.filename_type], latest['FolderName'], latest['VersionNumber']
 
     def get_download_link(self, token, filename, foldername):
         headers = {'Content-Type': 'application/json; charset=UTF-8',
@@ -198,7 +200,7 @@ class ContentDownloader(object):
                    'X-Requested-With': 'XMLHttpRequest',
                    }
         payload = {'__RequestVerificationToken': token,
-                   'FileName': filename,
+                   'FileName': filename, # TODO should do something abt this?
                    'FolderName': foldername,
                    }
         response = requests.post(self.GET_LINK_URL, json=payload, headers=headers).json()
@@ -232,6 +234,7 @@ def parse_arguments():
     parser.add_argument('-p', '--package', help="Options: appthreat, app, antivirus, wildfire (for PAN-OS 7.0 and"
                                                 " lower), or wildfire2 (for PAN-OS 7.1 and higher), wf500, traps,"
                                                 " clientless. If ommited, defaults to 'appthreat'.")
+    parser.add_argument('-n', '--notes', action='store_true', help='Download release notes instead of package.')
     return parser.parse_args()
 
 
@@ -261,7 +264,7 @@ def main():
 
     # Create contentdownloader object
     content_downloader = ContentDownloader(username=username, password=password, package=options.package,
-                                           debug=debugenabled)
+                                           debug=debugenabled, isReleaseNotes=options.notes)
 
     # Check latest version. Login if necessary.
     token, updates = content_downloader.check()
