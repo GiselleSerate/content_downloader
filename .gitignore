@@ -7,6 +7,7 @@ __pycache__/
 
 # Distribution / packaging
 .Python
+.env/
 env/
 build/
 develop-eggs/
@@ -61,5 +62,4 @@ target/
 
 *.txt
 
-# Don't accidentally push the passwords pls
-content_downloader.conf
+contentpacks/
