@@ -136,10 +136,12 @@ class ContentDownloader(object):
         self.browser.form['Email'] = self.username
         self.browser.form['Password'] = self.password
         self.browser.submit()
+        response = self.browser.response()
+        encoding = response.info().get_param('charset', 'utf8')
         # This has resulted in an error page
-        if self.browser.response().read().find(bytes("The user name or password provided is incorrect.", 'utf-8')) != -1:
+        if response.read().decode(encoding).find("The user name or password provided is incorrect.") != -1:
             raise LoginError("Username or password is incorrect")
-        if self.browser.response().read().find(bytes("Since your browser does not support JavaScript, you must press the Resume button once to proceed.", 'utf-8')) == -1:  # Getting this message is good
+        if response.read().decode(encoding).find("Since your browser does not support JavaScript, you must press the Resume button once to proceed.") == -1:  # Getting this message is good
             raise LoginError("Failed to login")
         # No Javascript, so have to submit the "Resume form"
         self.browser.open(self.UPDATE_URL)
@@ -153,16 +155,16 @@ class ContentDownloader(object):
         logging.debug("Checking for new content updates: %s" % self.package)
         result = self._check()
         needlogin = False
-        if result.find(bytes("<h1>Single Sign On</h1>", 'utf-8')) != -1:
+        if result.find("<h1>Single Sign On</h1>") != -1:
             needlogin = True
             logging.debug("Got single sign on page")
-        elif result.find(bytes("<h4>You are not authorized to perform this action.</h4>", 'utf-8')) != -1:
+        elif result.find("<h4>You are not authorized to perform this action.</h4>") != -1:
             needlogin = True
             logging.debug("Got not authorized page")
-        elif result.find(bytes('webData.pageName = "support:portal:Unauth Home"', 'utf-8')) != -1:
+        elif result.find('webData.pageName = "support:portal:Unauth Home"') != -1:
             needlogin = True
             logging.debug("Got loading screen")
-        elif result.find(bytes('<img src="/assets/img/pan-loading.gif" alt="Loading"/>', 'utf-8')) != -1:
+        elif result.find('<img src="/assets/img/pan-loading.gif" alt="Loading"/>') != -1:
             needlogin = True
             logging.debug("Got loading screen")
         if needlogin:
@@ -173,13 +175,15 @@ class ContentDownloader(object):
         # Grab the __RequestVerificationToken
         self.browser.select_form(nr=0)
         token = self.browser.form['__RequestVerificationToken']
-        match = re.search(rb'"data":({"Data":.*?"Total":\d+,"AggregateResults":null})', result)
+        match = re.search(r'"data":({"Data":.*?"Total":\d+,"AggregateResults":null})', result)
         updates = json.loads(match.group(1))
         return token, updates['Data']
 
     def _check(self):
         self.browser.open(self.UPDATE_URL)
-        return self.browser.response().read()
+        response = self.browser.response()
+        encoding = response.info().get_param('charset', 'utf8')
+        return response.read().decode(encoding)
 
     def find_latest_update(self, updates):
         updates_of_type = [u for u in updates if u['Key'] == self.key]
