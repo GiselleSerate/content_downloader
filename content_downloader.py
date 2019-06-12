@@ -60,6 +60,10 @@ class UnknownPackage(Exception):
     pass
 
 
+class ConfigError(Exception):
+    pass
+
+
 class ContentDownloader(object):
     """Checks for new content packages and downloads the latest"""
 
@@ -88,11 +92,11 @@ class ContentDownloader(object):
         "traps": "TRAPS3.4",
         "clientless": "GPCONTENTS",
     }
-    LOGIN_URL = "https://identity.paloaltonetworks.com/idp/startSSO.ping?PartnerSpId=supportCSP&TargetResource=https://support.paloaltonetworks.com/Updates/DynamicUpdates/245"
-    UPDATE_URL = "https://support.paloaltonetworks.com/Updates/DynamicUpdates/245"
+    LOGIN_URL = "https://identity.paloaltonetworks.com/idp/startSSO.ping?PartnerSpId=supportCSP&TargetResource=https://support.paloaltonetworks.com/Updates/DynamicUpdates/{companyid}"
+    UPDATE_URL = "https://support.paloaltonetworks.com/Updates/DynamicUpdates/{companyid}"
     GET_LINK_URL = "https://support.paloaltonetworks.com/Updates/GetDownloadUrl"
 
-    def __init__(self, username, password, package="appthreat", debug=True, isReleaseNotes=False):
+    def __init__(self, username, password, company_id, package="appthreat", debug=False, isReleaseNotes=False):
         if package is None:
             package = "appthreat"
         if package not in self.PACKAGE_KEY:
@@ -110,6 +114,14 @@ class ContentDownloader(object):
             logging.debug("No existing cookies found")
             pass
         self.browser = self.get_browser(debug)
+        
+        if company_id == '':
+            logging.error("No 'companyid' set in config file. This will probably result in some error.")
+        url_options = {"companyid": company_id}
+        self.login_url = self.LOGIN_URL.format(**url_options)
+        self.update_url = self.UPDATE_URL.format(**url_options)
+        self.get_link_url = self.GET_LINK_URL.format(**url_options)
+
 
     def get_browser(self, debug=False):
         br = mechanize.Browser()
@@ -133,6 +145,8 @@ class ContentDownloader(object):
 
     def login(self):
         self.browser.open(self.LOGIN_URL)
+        logging.info("Logging in")
+        self.browser.open(self.login_url)
         self.browser.select_form(nr=0)
         self.browser.form['Email'] = self.username
         self.browser.form['Password'] = self.password
@@ -147,7 +161,7 @@ class ContentDownloader(object):
         if response.read().decode(encoding).find("Since your browser does not support JavaScript, you must press the Resume button once to proceed.") == -1:  # Getting this message is good
             raise LoginError("Failed to login")
         # No Javascript, so have to submit the "Resume form"
-        self.browser.open(self.UPDATE_URL)
+        self.browser.open(self.update_url)
         self.browser.select_form(nr=0)
         self.browser.submit()
         html = self.browser.response().read()
@@ -166,7 +180,7 @@ class ContentDownloader(object):
             logging.debug("Got not authorized page")
         elif result.find('webData.pageName = "support:portal:Unauth Home"') != -1:
             needlogin = True
-            logging.debug("Got loading screen")
+            logging.debug("Got unauth screen")
         elif result.find('<img src="/assets/img/pan-loading.gif" alt="Loading"/>') != -1:
             needlogin = True
             logging.debug("Got loading screen")
@@ -179,12 +193,14 @@ class ContentDownloader(object):
         self.browser.select_form(nr=0)
         token = self.browser.form['__RequestVerificationToken']
         match = re.search(r'"data":({"Data":.*?"Total":\d+,"AggregateResults":null})', result)
+        if match is None:
+            raise GetLinkError("You have no access to download files. Probably some hardcoded URL is wrong, or you set wrong 'companyid' in config file.")
         updates = json.loads(match.group(1))
         logging.debug(updates)
         return token, updates['Data']
 
     def _check(self):
-        self.browser.open(self.UPDATE_URL)
+        self.browser.open(self.update_url)
         response = self.browser.response()
         encoding = response.info().get_param('charset', 'utf8')
         return response.read().decode(encoding)
@@ -205,7 +221,7 @@ class ContentDownloader(object):
                    'FileName': filename,
                    'FolderName': foldername,
                    }
-        response = requests.post(self.GET_LINK_URL, json=payload, headers=headers).json()
+        response = requests.post(self.get_link_url, json=payload, headers=headers).json()
         if 'Success' not in response or not response['Success']:
             raise GetLinkError("Failure getting download link: {0}".format(response))
         return response['DownloadUrl']
@@ -225,9 +241,10 @@ def get_config(filename):
     username = config.get('config', 'username')
     password = config.get('config', 'password', raw=True)
     download_dir = config.get('config', 'filedir')
+    company_id = config.get('config', 'companyid')
     if download_dir == "":
         download_dir = os.getcwd()
-    return username, password, download_dir
+    return username, password, download_dir, company_id
 
 
 def parse_arguments():
@@ -262,11 +279,10 @@ def main():
     debugenabled = enable_logging(options)
 
     # Config file (for support account credentials)
-    username, password, download_dir = get_config('content_downloader.conf')
+    username, password, download_dir, company_id = get_config('content_downloader.conf')
 
     # Create contentdownloader object
-    content_downloader = ContentDownloader(username=username, password=password, package=options.package,
-                                           debug=debugenabled, isReleaseNotes=options.notes)
+    content_downloader = ContentDownloader(username=username, password=password, company_id=company_id, package=options.package, debug=debugenabled, isReleaseNotes=options.notes)
 
     # Check latest version. Login if necessary.
     token, updates = content_downloader.check()
