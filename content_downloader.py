@@ -40,6 +40,8 @@ from datetime import datetime
 
 import mechanize
 import requests
+from guerrillamail import GuerrillaMailSession
+
 
 # Optional: Disable insecure platform warnings
 #import requests.packages.urllib3
@@ -142,6 +144,7 @@ class ContentDownloader(object):
         self.browser.select_form(nr=0)
         self.browser.form['Email'] = self.username
         self.browser.form['Password'] = self.password
+        self.last_request = datetime.now()
         self.browser.submit()
         response = self.browser.response()
         encoding = response.info().get_param('charset', 'utf8')
@@ -162,6 +165,17 @@ class ContentDownloader(object):
         html = self.browser.response().read()
         # Save login cookie
         self._save_cookies()
+
+    def getOTP(self):
+        session = GuerrillaMailSession(email_address='phoenix@guerrillamailblock.com')
+        # Wait for email to arrive
+        while True:
+            latest_summary = session.get_email_list()[0]
+            if(latest_summary.sender != self.username or latest_summary.datetime < self.last_request):
+                sleep(10) # Guerrilla only refreshes once in 10 seconds. 
+        # Read the email with the OTP
+        email = session.get_email(email_summary.guid)
+        print(email.body)
 
     def check(self):
         logging.info("Checking for new content updates: %s" % self.package)
@@ -197,7 +211,12 @@ class ContentDownloader(object):
         self.browser.open(self.update_url)
         response = self.browser.response()
         encoding = response.info().get_param('charset', 'utf8')
-        return response.read().decode(encoding)
+        result = response.read().decode(encoding) # TODO: Not working. Was returning this. 
+        self.browser.open(self.update_url)
+        self.browser.select_form(nr=0)
+        self.browser.submit()
+        html = self.browser.response().read()
+        print(html)
 
     def find_latest_update(self, updates):
         updates_of_type = [u for u in updates if u['Key'] == self.key]
