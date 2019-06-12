@@ -31,9 +31,9 @@ from __future__ import print_function
 import os
 import sys
 import re
-import cookielib
+import http.cookiejar
 import logging
-import ConfigParser
+from configparser import ConfigParser
 import argparse
 import json
 from datetime import datetime
@@ -45,16 +45,16 @@ import requests
 #import requests.packages.urllib3
 #requests.packages.urllib3.disable_warnings()
 
-class LoginError(StandardError):
+class LoginError(Exception):
     pass
 
-class GetLinkError(StandardError):
+class GetLinkError(Exception):
     pass
 
-class ConfigError(StandardError):
+class ConfigError(Exception):
     pass
 
-class UnknownPackage(StandardError):
+class UnknownPackage(Exception):
     pass
 
 
@@ -90,7 +90,7 @@ class ContentDownloader(object):
     UPDATE_URL = "https://support.paloaltonetworks.com/Updates/DynamicUpdates/{companyid}"
     GET_LINK_URL = "https://support.paloaltonetworks.com/Updates/GetDownloadUrl"
 
-    def __init__(self, username, password, company_id, package="appthreat", debug=False):
+    def __init__(self, username, password, company_id, package="appthreat", debug=False, isReleaseNotes=False):
         if package is None:
             package = "appthreat"
         if package not in self.PACKAGE_KEY:
@@ -99,7 +99,8 @@ class ContentDownloader(object):
         self.password = password
         self.package = package
         self.key = self.PACKAGE_KEY[package]
-        self.cj = cookielib.LWPCookieJar()
+        self.filename_string = 'ReleaseNotesFileName' if isReleaseNotes else 'FileName'
+        self.cj = http.cookiejar.LWPCookieJar()
         try:
             self.cj.load("cookies.txt", ignore_discard=True, ignore_expires=True)
         except IOError:
@@ -142,10 +143,14 @@ class ContentDownloader(object):
         self.browser.form['Email'] = self.username
         self.browser.form['Password'] = self.password
         self.browser.submit()
+        response = self.browser.response()
+        encoding = response.info().get_param('charset', 'utf8')
         # This has resulted in an error page
-        if self.browser.response().read().find("The user name or password provided is incorrect.") != -1:
+        if response.read().decode(encoding).find("The user name or password provided is incorrect.") != -1:
             raise LoginError("Username or password is incorrect")
-        if self.browser.response().read().find(
+        response = self.browser.response()
+        encoding = response.info().get_param('charset', 'utf8')
+        if response.read().decode(encoding).find(
                 "Since your browser does not support JavaScript,"
                 " you must press the Resume button once to proceed."
         ) == -1: # Getting this message is good
@@ -190,14 +195,16 @@ class ContentDownloader(object):
 
     def _check(self):
         self.browser.open(self.update_url)
-        return self.browser.response().read()
+        response = self.browser.response()
+        encoding = response.info().get_param('charset', 'utf8')
+        return response.read().decode(encoding)
 
     def find_latest_update(self, updates):
         updates_of_type = [u for u in updates if u['Key'] == self.key]
         updates_sorted = sorted(updates_of_type, key=lambda x: datetime.strptime(x['ReleaseDate'], '%Y-%m-%dT%H:%M:%S'))
         latest = updates_sorted[-1]
-        logging.info("Found latest update:  {0}  Released {1}".format(latest['FileName'], latest['ReleaseDate']))
-        return latest['FileName'], latest['FolderName'], latest['VersionNumber']
+        logging.info("Found latest update:  {0}  Released {1}".format(latest[self.filename_string], latest['ReleaseDate']))
+        return latest[self.filename_string], latest['FolderName'], latest['VersionNumber']
 
     def get_download_link(self, token, filename, foldername):
         headers = {'Content-Type': 'application/json; charset=UTF-8',
@@ -223,7 +230,7 @@ class ContentDownloader(object):
 
 
 def get_config(filename):
-    config = ConfigParser.SafeConfigParser({"filedir": ""})
+    config = ConfigParser({"filedir": ""})
     config.read(filename)
     username = config.get('config', 'username')
     password = config.get('config', 'password', raw=True)
@@ -240,6 +247,7 @@ def parse_arguments():
     parser.add_argument('-p', '--package', help="Options: appthreat, app, antivirus, wildfire (for PAN-OS 7.0 and"
                                                 " lower), or wildfire2 (for PAN-OS 7.1 and higher), wf500, traps,"
                                                 " clientless. If ommited, defaults to 'appthreat'.")
+    parser.add_argument('-n', '--notes', action='store_true', help='Download release notes instead of package.')
     return parser.parse_args()
 
 
@@ -253,6 +261,8 @@ def enable_logging(options):
             logging_level = logging.DEBUG
             logging_format = '%(levelname)s: %(message)s'
         logging.basicConfig(format=logging_format, level=logging_level)
+    else:
+        return False
     return True if options.verbose > 1 else False
 
 
@@ -266,7 +276,7 @@ def main():
     username, password, download_dir, company_id = get_config('content_downloader.conf')
 
     # Create contentdownloader object
-    content_downloader = ContentDownloader(username=username, password=password, company_id=company_id, package=options.package, debug=debugenabled)
+    content_downloader = ContentDownloader(username=username, password=password, company_id=company_id, package=options.package, debug=debugenabled, isReleaseNotes=options.notes)
 
     # Check latest version. Login if necessary.
     token, updates = content_downloader.check()
