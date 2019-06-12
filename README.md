@@ -80,6 +80,11 @@ Possible values for `-p` argument:
 Note: The *wildfire* package is for PAN-OS 7.0 and lower, the *wildfire2*
 package is for PAN-OS 7.1 and higher.
 
+If **instead** of the package you would like to download the release notes associated with it, specify the -n flag.
+
+    python content-downloader.py -n
+
+
 Disclaimer
 ----------
 

@@ -24,7 +24,7 @@ Downloads the latest content packs from paloaltonetworks.com.
 This software is provided without support, warranty, or guarantee.
 Use at your own risk.
 
-Works with python 2.7 only.
+Now works with Python 3. 
 """
 
 from __future__ import print_function
