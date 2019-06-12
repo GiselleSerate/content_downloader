@@ -63,3 +63,6 @@ target/
 
 .DS_Store
 contentpacks
+
+# Prevent accidentally committing passwords
+content_downloader.conf
