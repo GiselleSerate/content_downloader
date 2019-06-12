@@ -37,8 +37,10 @@ from configparser import ConfigParser
 import argparse
 import json
 from datetime import datetime
+from time import sleep
 
-import mechanize
+# import mechanize
+import mechanicalsoup
 import requests
 from guerrillamail import GuerrillaMailSession
 
@@ -120,22 +122,12 @@ class ContentDownloader(object):
 
 
     def get_browser(self, debug=False):
-        br = mechanize.Browser()
+        br = mechanicalsoup.StatefulBrowser()
         # Cookie Jar
         br.set_cookiejar(self.cj)
-        # Browser options
-        br.set_handle_equiv(True)
-        #br.set_handle_gzip(True)
-        br.set_handle_redirect(True)
-        br.set_handle_referer(True)
-        br.set_handle_robots(False)
         br.addheaders = [
             ("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/44.0.2403.157 Safari/537.36"),
         ]
-        if debug:
-            br.set_debug_http(True)
-            br.set_debug_redirects(True)
-            br.set_debug_responses(True)
         return br
 
     def login(self):
@@ -170,9 +162,9 @@ class ContentDownloader(object):
         session = GuerrillaMailSession(email_address='phoenix@guerrillamailblock.com')
         # Wait for email to arrive
         while True:
-            latest_summary = session.get_email_list()[0]
-            if(latest_summary.sender != self.username or latest_summary.datetime < self.last_request):
-                sleep(10) # Guerrilla only refreshes once in 10 seconds. 
+            inbox = session.get_email_list()
+            if(len(inbox) == 0 or inbox[0].sender != self.username or index[0].datetime < self.last_request):
+                sleep(30) # Don't overwhelm Guerrilla
         # Read the email with the OTP
         email = session.get_email(email_summary.guid)
         print(email.body)
@@ -209,7 +201,16 @@ class ContentDownloader(object):
 
     def _check(self):
         self.browser.open(self.update_url)
-        response = self.browser.response()
+        page = self.browser.get(self.update_url)
+        print(page.soup.prettify())
+        form = page.soup.form
+        self.browser.submit(form, page.url)
+        print('wait')
+        sleep(3333)
+        form.find("input", {"name": "otp"})["value"] = self.getOTP()
+        response = self.browser.submit(form, page.url)
+        print(response)
+        # self.browser.launch_browser()
         encoding = response.info().get_param('charset', 'utf8')
         result = response.read().decode(encoding) # TODO: Not working. Was returning this. 
         self.browser.open(self.update_url)
